@@ -7,8 +7,6 @@ import warnings
 
 import paho.mqtt.client as mqtt
 
-MQTTHOST = ""
-
 
 class MQTTQueuePublisher(mqtt.Client):
     """MQTT client that publishes data to a topic from its own queue.
@@ -48,7 +46,6 @@ class MQTTQueuePublisher(mqtt.Client):
         """
         if self._topic is None:
             self._topic = topic
-            self.loop_start()  # start MQTT client thread
             self._q = collections.deque()
             self._t = threading.Thread(target=self._queue_publisher)
             self._t.start()
@@ -59,10 +56,13 @@ class MQTTQueuePublisher(mqtt.Client):
 
     def end_q(self):
         """End a thread that publishes data to a topic from its own queue."""
-        self._q.appendleft("stop")  # send the queue thread a stop command
-        self._t.join()  # join thread
+        # send the queue thread a stop command
+        self._q.appendleft("stop")
+        # join thread
+        self._t.join()
         self.loop_stop()
-        self._topic = None  # forget thread and queue
+        # forget thread and queue
+        self._topic = None
 
     def append_payload(self, payload):
         """Append a payload to a queue.
@@ -99,3 +99,20 @@ class MQTTQueuePublisher(mqtt.Client):
         """
         self.end_q()
         self.disconnect()
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--mqtthost",
+        default="127.0.0.1",
+        help="IP address or hostname of MQTT broker.",
+    )
+    args = parser.parse_args()
+
+    with MQTTQueuePublisher as qp:
+        # connect MQTT client to broker
+        qp.connect(args.mqtthost)
+        qp.loop_forever()
