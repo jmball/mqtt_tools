@@ -24,19 +24,14 @@ class MQTTQueuePublisher(mqtt.Client):
         called in the same way as for the base mqtt.Client.
         """
         super().__init__()
-        self._topic = None
-
-    @property
-    def topic(self):
-        """Get topic attribute."""
-        return self._topic
+        self._t = threading.Thread()
 
     @property
     def q_size(self):
         """Get current length of deque."""
         return len(self._q)
 
-    def start_q(self, topic):
+    def start_q(self):
         """Start queue and mqtt client threads.
 
         The MQTT client publishes data to a topic from its own queue.
@@ -44,33 +39,33 @@ class MQTTQueuePublisher(mqtt.Client):
         topic : str
             MQTT topic to publish to.
         """
-        if self._topic is None:
-            self._topic = topic
+        if self._t.is_alive() is False:
             self._q = collections.deque()
             self._t = threading.Thread(target=self._queue_publisher)
             self._t.start()
         else:
             warnings.warn(
-                f"A queue for '{self._topic}' is already running. End that queue first or instantiate a new queue publisher client."
+                "A queue is already running. End that queue first or instantiate "
+                + "a new queue publisher client."
             )
 
     def end_q(self):
-        """End a thread that publishes data to a topic from its own queue."""
-        # send the queue thread a stop command
-        self._q.appendleft("stop")
-        # join thread
-        self._t.join()
-        self.loop_stop()
-        # forget thread and queue
-        self._topic = None
+        """End a thread that publishes data from a queue."""
+        if self._t.is_alive() is True:
+            # send the queue thread a stop command
+            self._q.appendleft("stop")
+            # join thread
+            self._t.join()
 
-    def append_payload(self, payload):
+    def append_payload(self, payload, topic):
         """Append a payload to a queue.
 
         payload : str
             Message to be added to deque.
+        topic : str
+            Topic to publish to.
         """
-        self._q.append(payload)
+        self._q.append([payload, topic])
 
     def _queue_publisher(self):
         """Publish elements in the queue.
@@ -82,11 +77,11 @@ class MQTTQueuePublisher(mqtt.Client):
         """
         while True:
             if len(self._q) > 0:
-                payload = self._q.popleft()
+                payload, topic = self._q.popleft()
                 if payload == "stop":
                     break
                 # publish paylod with blocking wait for completion
-                self.publish(self._topic, payload, qos=2).wait_for_publish()
+                self.publish(topic, payload, qos=2).wait_for_publish()
 
     def __enter__(self):
         """Enter the runtime context related to this object."""
@@ -98,6 +93,7 @@ class MQTTQueuePublisher(mqtt.Client):
         Make sure everything gets cleaned up properly.
         """
         self.end_q()
+        self.loop_stop()
         self.disconnect()
 
 
