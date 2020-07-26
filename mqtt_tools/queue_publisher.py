@@ -26,12 +26,24 @@ class MQTTQueuePublisher(mqtt.Client):
         super().__init__()
         self._t = threading.Thread()
 
+    def run(self, mqtthost):
+        """Connect the client and start the queue thread."""
+        self.connect(mqtthost)
+        self.loop_start()
+        self._start_q()
+
+    def stop(self):
+        """Disconnect the client."""
+        self._end_q()
+        self.loop_stop()
+        self.disconnect()
+
     @property
     def q_size(self):
         """Get current length of deque."""
         return len(self._q)
 
-    def start_q(self):
+    def _start_q(self):
         """Start queue and mqtt client threads.
 
         The MQTT client publishes data to a topic from its own queue.
@@ -49,7 +61,7 @@ class MQTTQueuePublisher(mqtt.Client):
                 + "a new queue publisher client."
             )
 
-    def end_q(self):
+    def _end_q(self):
         """End a thread that publishes data from a queue."""
         if self._t.is_alive() is True:
             # send the queue thread a stop command
@@ -94,9 +106,7 @@ class MQTTQueuePublisher(mqtt.Client):
 
         Make sure everything gets cleaned up properly.
         """
-        self.end_q()
-        self.loop_stop()
-        self.disconnect()
+        self.stop()
 
 
 if __name__ == "__main__":
