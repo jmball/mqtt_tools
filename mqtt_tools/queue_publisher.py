@@ -57,15 +57,17 @@ class MQTTQueuePublisher(mqtt.Client):
             # join thread
             self._t.join()
 
-    def append_payload(self, payload, topic):
+    def append_payload(self, payload, topic, retain=False):
         """Append a payload to a queue.
 
         payload : str
             Message to be added to deque.
         topic : str
             Topic to publish to.
+        retain : bool
+            Flag whether or not the message should be retained.
         """
-        self._q.append([payload, topic])
+        self._q.append([payload, topic, retain])
 
     def _queue_publisher(self):
         """Publish elements in the queue.
@@ -77,11 +79,11 @@ class MQTTQueuePublisher(mqtt.Client):
         """
         while True:
             if len(self._q) > 0:
-                payload, topic = self._q.popleft()
+                payload, topic, retain = self._q.popleft()
                 if payload == "stop":
                     break
                 # publish paylod with blocking wait for completion
-                self.publish(topic, payload, qos=2).wait_for_publish()
+                self.publish(topic, payload, 2, retain).wait_for_publish()
 
     def __enter__(self):
         """Enter the runtime context related to this object."""
