@@ -33,10 +33,13 @@ class MQTTQueuePublisher(mqtt.Client):
         self._start_q()
 
     def stop(self):
-        """Disconnect the client."""
+        """Stop the client loop.
+
+        Does not disconnect the client normally to allow last will and testament to be
+        used.
+        """
         self._end_q()
         self.loop_stop()
-        self.disconnect()
 
     @property
     def q_size(self):
