@@ -72,7 +72,7 @@ class MQTTQueuePublisher(mqtt.Client):
             # join thread
             self._t.join()
 
-    def append_payload(self, payload, topic, retain=False):
+    def append_payload(self, topic, payload, retain=False):
         """Append a payload to a queue.
 
         payload : str
