@@ -109,6 +109,10 @@ class MQTTQueuePublisher(mqtt.Client):
 
         Make sure everything gets cleaned up properly.
         """
+        # wait for all messages to be published
+        while True:
+            if len(self._q) == 0:
+                break
         self.stop()
 
 
