@@ -68,7 +68,7 @@ class MQTTQueuePublisher(mqtt.Client):
         """End a thread that publishes data from a queue."""
         if self._t.is_alive() is True:
             # send the queue thread a stop command
-            self._q.appendleft("stop")
+            self._q.appendleft(["stop", "", False])
             # join thread
             self._t.join()
 
@@ -125,5 +125,5 @@ if __name__ == "__main__":
 
     with MQTTQueuePublisher as qp:
         # connect MQTT client to broker
-        qp.connect(args.mqtthost)
+        qp.run(args.mqtthost)
         qp.loop_forever()
