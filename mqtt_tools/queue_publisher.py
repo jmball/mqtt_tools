@@ -96,6 +96,7 @@ class MQTTQueuePublisher(mqtt.Client):
             if len(self._q) > 0:
                 payload, topic, retain = self._q.popleft()
                 if payload == "stop":
+                    self._q = collections.deque()
                     break
                 # publish paylod with blocking wait for completion
                 self.publish(topic, payload, 2, retain).wait_for_publish()
