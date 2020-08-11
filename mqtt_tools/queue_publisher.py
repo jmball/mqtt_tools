@@ -1,9 +1,8 @@
 #!/usr/bin/env python
 """MQTT client producing data."""
 
-import collections
+import queue
 import threading
-import warnings
 
 import paho.mqtt.client as mqtt
 
@@ -24,82 +23,6 @@ class MQTTQueuePublisher(mqtt.Client):
         called in the same way as for the base mqtt.Client.
         """
         super().__init__()
-        self._t = threading.Thread()
-
-    def run(self, mqtthost):
-        """Connect the client and start the queue thread."""
-        self.connect(mqtthost)
-        self.loop_start()
-        self._start_q()
-
-    def stop(self):
-        """Stop the client loop.
-
-        Does not disconnect the client normally to allow last will and testament to be
-        used.
-        """
-        self._end_q()
-        self.loop_stop()
-
-    @property
-    def q_size(self):
-        """Get current length of deque."""
-        return len(self._q)
-
-    def _start_q(self):
-        """Start queue and mqtt client threads.
-
-        The MQTT client publishes data to a topic from its own queue.
-
-        topic : str
-            MQTT topic to publish to.
-        """
-        if self._t.is_alive() is False:
-            self._q = collections.deque()
-            self._t = threading.Thread(target=self._queue_publisher)
-            self._t.start()
-        else:
-            warnings.warn(
-                "A queue is already running. End that queue first or instantiate "
-                + "a new queue publisher client."
-            )
-
-    def _end_q(self):
-        """End a thread that publishes data from a queue."""
-        if self._t.is_alive() is True:
-            # send the queue thread a stop command
-            self._q.appendleft(["stop", "", False])
-            # join thread
-            self._t.join()
-
-    def append_payload(self, topic, payload, retain=False):
-        """Append a payload to a queue.
-
-        payload : str
-            Message to be added to deque.
-        topic : str
-            Topic to publish to.
-        retain : bool
-            Flag whether or not the message should be retained.
-        """
-        self._q.append([payload, topic, retain])
-
-    def _queue_publisher(self):
-        """Publish elements in the queue.
-
-        q : deque
-            Deque to publish from.
-        topic : str
-            MQTT topic to publish to.
-        """
-        while True:
-            if len(self._q) > 0:
-                payload, topic, retain = self._q.popleft()
-                if payload == "stop":
-                    self._q = collections.deque()
-                    break
-                # publish paylod with blocking wait for completion
-                self.publish(topic, payload, 2, retain).wait_for_publish()
 
     def __enter__(self):
         """Enter the runtime context related to this object."""
@@ -112,9 +35,56 @@ class MQTTQueuePublisher(mqtt.Client):
         """
         # wait for all messages to be published
         while True:
-            if len(self._q) == 0:
+            if self._q.empty() is True:
                 break
-        self.stop()
+        self.loop_stop()
+        self.disconnect()
+
+    def on_connect(self, mqttc, obj, flags, rc):
+        """Act on client connection to MQTT broker."""
+        self._start_q()
+
+    @property
+    def q_size(self):
+        """Get current length of queue."""
+        return self._q.qsize()
+
+    def _start_q(self):
+        """Start queue and mqtt client threads.
+
+        The MQTT client publishes data to a topic from its own queue.
+
+        topic : str
+            MQTT topic to publish to.
+        """
+        self._q = queue.Queue()
+        threading.Thread(target=self._queue_publisher, daemon=True).start()
+
+    def _queue_publisher(self):
+        """Publish elements in the queue.
+
+        q : queue.Queue
+            Queue to publish from.
+        topic : str
+            MQTT topic to publish to.
+        """
+        while True:
+            topic, payload, retain = self._q.get()
+            # publish paylod with blocking wait for completion
+            self.publish(topic, payload, 2, retain).wait_for_publish()
+            self._q.task_done()
+
+    def append_payload(self, topic, payload, retain=False):
+        """Append a payload to a queue.
+
+        payload : str
+            Message to be added to queue.
+        topic : str
+            Topic to publish to.
+        retain : bool
+            Flag whether or not the message should be retained.
+        """
+        self._q.put_nowait([topic, payload, retain])
 
 
 if __name__ == "__main__":
@@ -130,5 +100,5 @@ if __name__ == "__main__":
 
     with MQTTQueuePublisher as qp:
         # connect MQTT client to broker
-        qp.run(args.mqtthost)
+        qp.connect(args.mqtthost)
         qp.loop_forever()
