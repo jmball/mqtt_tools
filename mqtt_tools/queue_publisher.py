@@ -23,6 +23,7 @@ class MQTTQueuePublisher(mqtt.Client):
         called in the same way as for the base mqtt.Client.
         """
         super().__init__()
+        self._start_q()
 
     def __enter__(self):
         """Enter the runtime context related to this object."""
@@ -40,9 +41,9 @@ class MQTTQueuePublisher(mqtt.Client):
         self.loop_stop()
         self.disconnect()
 
-    def on_connect(self, mqttc, obj, flags, rc):
-        """Act on client connection to MQTT broker."""
-        self._start_q()
+    # def on_connect(self, mqttc, obj, flags, rc):
+    #     """Act on client connection to MQTT broker."""
+    #     self._start_q()
 
     @property
     def q_size(self):
