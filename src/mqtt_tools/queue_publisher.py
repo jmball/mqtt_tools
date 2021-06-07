@@ -34,16 +34,16 @@ class MQTTQueuePublisher(mqtt.Client):
 
         Make sure everything gets cleaned up properly.
         """
+        self.stop()
+
+    def stop(self):
+        """Stop the queue publisher."""
         # wait for all messages to be published
         while True:
             if self._q.empty() is True:
                 break
         self.loop_stop()
         self.disconnect()
-
-    # def on_connect(self, mqttc, obj, flags, rc):
-    #     """Act on client connection to MQTT broker."""
-    #     self._start_q()
 
     @property
     def q_size(self):
